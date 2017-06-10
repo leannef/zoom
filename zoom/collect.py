@@ -1,8 +1,8 @@
 """
     zoom.collect
 """
-
 import logging
+from datetime import datetime
 
 from zoom.browse import browse
 from zoom.context import context
@@ -11,6 +11,7 @@ from zoom.fields import ButtonField
 from zoom.forms import form_for, delete_form
 from zoom.helpers import link_to
 from zoom.models import Model
+from zoom.response import JSONResponse
 from zoom.store import EntityStore
 from zoom.mvc import View, Controller
 from zoom.utils import name_for, id_for
@@ -53,6 +54,19 @@ def locate(collection, key):
         collection.store.first(**{collection.store.key: key}) or
         scan(collection.store, key)
     )
+
+
+def as_data_feed(request, data, **feed):
+    """ return the data wrapped in a feed format """
+    feed['data'] = callable(data) and data() or data
+    feed['endpoint'] = ''.join([request.site.abs_url, request.uri])
+
+    return {
+        'downloaded': datetime.now(),
+        'contact': request.site.admin_email,
+        'site': request.site.abs_url,
+        'feed': feed
+    }
 
 
 class CollectionStore(object):
@@ -227,6 +241,20 @@ class CollectionView(View):
             record = locate(self.collection, key)
             if record:
                 return page(delete_form(record.name))
+
+    def autocomplete(self, term='', attribute='name', *_, **__):
+        """A JSON response friendly for autocomplete type usage"""
+        request = self.collection.request
+        term = term.casefold()
+
+        data = {
+            rec[attribute] for rec in self.collection.store
+            if attribute in rec and
+            (not term or rec[attribute].casefold().find(term) > -1) and
+            request.user.can('read', rec)
+        }
+
+        return JSONResponse(as_data_feed(request, sorted(data)))
 
 
 class CollectionController(Controller):
