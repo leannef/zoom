@@ -487,6 +487,40 @@ class EntityStore(object):
             result = keys[0] in found_keys
         return result
 
+    def dimension(self, *attributes):
+        """
+        Retrieves a subset of the total attributes for all the entities.
+        This can reduce query cost for large entities.
+
+            >>> db = setup_test()
+            >>> class Person(Entity): pass
+            >>> class People(EntityStore): pass
+            >>> people = People(db, Person)
+            >>> id = people.put(Person(name='Sally', age=25))
+            >>> id = people.put(Person(name='Sam', age=22))
+            >>> id = people.put(Person(name='Joe', age=25))
+            >>> people.dimension('name')
+            ['Joe', 'Sally', 'Sam']
+            >>> people.dimension('name', 'age')
+            [('Joe', 25), ('Sally', 25), ('Sam', 22)]
+            >>> db.close()
+
+        """
+        if attributes is None:
+            return self.all()
+
+        cmd = 'select * from attributes where kind=%s and attribute in (%s)' % (
+            '%s', ','.join(['%s']*len(attributes))
+            )
+        rs = self.db(cmd, self.kind, *attributes)
+
+        results = {tuple(r[a] for a in attributes) for r in entify(rs, self)}
+
+        if len(attributes) == 1:
+            return sorted({a[0] for a in results})
+        if results:
+            return sorted(results)
+
     def all(self):
         """
         Retrieves all entities

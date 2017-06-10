@@ -248,9 +248,8 @@ class CollectionView(View):
         term = term.casefold()
 
         data = {
-            rec[attribute] for rec in self.collection.store
-            if attribute in rec and
-            (not term or rec[attribute].casefold().find(term) > -1) and
+            rec for rec in self.collection.store.dimension(attribute)
+            if (not term or rec[attribute].casefold().find(term) > -1) and
             request.user.can('read', rec)
         }
 
