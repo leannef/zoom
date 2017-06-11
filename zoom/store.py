@@ -296,7 +296,7 @@ class EntityStore(object):
 
         return id
 
-    def get(self, keys):
+    def get(self, keys, *attributes):
         """
         retrives entities
 
@@ -331,6 +331,14 @@ class EntityStore(object):
               3 Alice  29 None
             2 person records
 
+            >>> print(people.get([1, '3'], 'name', 'salary'))
+            person
+            _id name  salary
+            --- ----- ------
+              1 Sam   100.00
+              3 Alice None
+            2 person records
+
             >>> db.close()
         """
         if keys is None:
@@ -349,10 +357,15 @@ class EntityStore(object):
             else:
                 return None
 
-        cmd = 'select * from attributes where kind=%s and row_id in (%s)' % (
-            '%s', ','.join(['%s']*len(keys))
+        if not attributes:
+            attrib_where = ''
+        else:
+            attrib_where = 'and attribute in (%s)' % (','.join(['%s']*len(attributes)))
+
+        cmd = 'select * from attributes where kind=%s %s and row_id in (%s)' % (
+            '%s', attrib_where, ','.join(['%s']*len(keys))
             )
-        rs = self.db(cmd, self.kind, *keys)
+        rs = self.db(cmd, self.kind, *attributes, *keys)
 
         result = entify(rs, self)
 
@@ -489,8 +502,8 @@ class EntityStore(object):
 
     def dimension(self, *attributes):
         """
-        Retrieves a subset of the total attributes for all the entities.
-        This can reduce query cost for large entities.
+        Retrieves a subset of the total attributes for all the entities (uniques
+        for a dimension).  This can reduce query cost for large entities.
 
             >>> db = setup_test()
             >>> class Person(Entity): pass
@@ -521,7 +534,7 @@ class EntityStore(object):
         if results:
             return sorted(results)
 
-    def all(self):
+    def all(self, *attributes):
         """
         Retrieves all entities
 
@@ -534,11 +547,20 @@ class EntityStore(object):
             >>> id = people.put(Person(name='Joe', age=25))
             >>> people.all()
             [<Person {'name': 'Sally', 'age': 25}>, <Person {'name': 'Sam', 'age': 25}>, <Person {'name': 'Joe', 'age': 25}>]
+            >>> people.all('name', '_id')
+            [<Person {'name': 'Sally'}>, <Person {'name': 'Sam'}>, <Person {'name': 'Joe'}>]
             >>> db.close()
 
         """
-        cmd = 'select * from attributes where kind="%s"' % (self.kind)
-        return entify(self.db(cmd), self)
+        if not attributes:
+            cmd = 'select * from attributes where kind=%s'
+        else:
+            cmd = 'select * from attributes where kind=%s and attribute in (%s)' % (
+                '%s', ','.join(['%s']*len(attributes))
+                )
+
+        rs = self.db(cmd, self.kind, *attributes)
+        return entify(rs, self)
 
     def zap(self):
         """
@@ -592,6 +614,7 @@ class EntityStore(object):
         """
         db = self.db
         all_keys = []
+
         for field_name in kv.keys():
             value = kv[field_name]
             if value is not None:
@@ -601,7 +624,7 @@ class EntityStore(object):
                 else:
                     wc = 'value in ('+','.join(['%s']*len(value))+')'
                     v = value
-                cmd = 'select distinct row_id from attributes where kind=%s and attribute=%s and '+wc
+                cmd = 'select distinct row_id from attributes where kind=%s and attribute=%s and {}'.format(wc)
                 rs = db(cmd, self.kind, field_name.lower(), *v)
                 all_keys.append([rec[0] for rec in rs])
         answer = all_keys and set(all_keys[0]) or set()
@@ -612,7 +635,7 @@ class EntityStore(object):
         else:
             return []
 
-    def find(self, **kv):
+    def find(self, *attributes, **kv):
         """
         finds entities that meet search criteria
 
@@ -632,13 +655,21 @@ class EntityStore(object):
               3 Bob   25
             2 person records
 
+            >>> print(people.find('name', age=25))
+            person
+            _id name
+            --- ----
+              1 Sam
+              3 Bob
+            2 person records
+
             >>> len(people.find(name='Sam'))
             1
 
             >>> db.close()
 
         """
-        return self.get(self._find(**kv))
+        return self.get(self._find(**kv), *attributes)
 
     def first(self, **kv):
         """
