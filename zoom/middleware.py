@@ -39,6 +39,7 @@ import zoom.context
 import zoom.cookies
 import zoom.html as html
 import zoom.logging
+import zoom.migration
 import zoom.models
 import zoom.queues
 import zoom.session
@@ -352,6 +353,7 @@ def handle(request, handlers=None):
         trap_errors,
         zoom.profiler.handler,
         zoom.request.handler,
+        zoom.migration.handler,
         serve_redirects,
         serve_favicon,
         serve_static,

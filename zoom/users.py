@@ -191,6 +191,9 @@ class User(Record):
         self.is_admin = self.is_member(site.administrators_group)
         self.is_developer = self.is_member(site.developers_group)
 
+        self.latest_activity = zoom.tools.now()
+        Users(self.get('__store').db).put(self)  # update the latest activity timestamp
+
         if self.is_developer:
             logger.debug('user is a developer')
         if self.is_admin:

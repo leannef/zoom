@@ -195,6 +195,28 @@ class Groups(RecordStore):
         )
 
 
+class ActiveMigration(DefaultRecord):
+    @property
+    def callable(self):
+        """Return the callable (alias for name)"""
+        return self.name
+
+    @property
+    def key(self):
+        """Return the key"""
+        return id_for(self.name)
+
+    @property
+    def url(self):
+        """Return a valid URL"""
+        return url_for_item(self.key)
+
+    @property
+    def link(self):
+        """Return a link"""
+        return link_to(self.name, self.url)
+
+
 def handler(request, handler, *rest):
     request.site.groups = Groups(request.site.db)
     request.site.users = Users(request.site.db)
